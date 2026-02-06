@@ -1,0 +1,92 @@
+name: CI – Tests & Linting
+
+on:
+  push:
+    branches: [ main, master, develop, feature/*, fix/*, refactor/* ]
+  pull_request:
+    branches: [ main, master, develop ]
+
+jobs:
+  test:
+    name: Run Tests
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv pip install --system -r requirements.txt
+        uv pip install --system pytest pytest-asyncio ruff mypy
+
+    - name: Run tests
+      run: uv run pytest tests/ -v
+
+  lint:
+    name: Lint & Type Check
+    runs-on: ubuntu-latest
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install uv
+      run: |
+        curl -LsSf https://astral.sh/uv/install.sh | sh
+        echo "$HOME/.cargo/bin" >> $GITHUB_PATH
+
+    - name: Install dependencies
+      run: |
+        uv venv
+        uv pip install --system ruff mypy
+
+    - name: Run Ruff lint
+      run: uv run ruff check .
+
+    - name: Run mypy type check
+      run: uv run mypy .
+
+  ai_review:
+    name: AI Review — Spec & Security
+    runs-on: ubuntu-latest
+    needs: [test, lint]
+
+    steps:
+    - name: Checkout code
+      uses: actions/checkout@v4
+
+    - name: Set up Python 3.12
+      uses: actions/setup-python@v5
+      with:
+        python-version: '3.12'
+
+    - name: Install tools
+      run: |
+        python -m pip install --upgrade pip
+        pip install bandit pip-audit
+
+    - name: Run spec alignment (CodeRabbit)
+      run: python scripts/spec_check.py
+
+    - name: Run Bandit
+      run: bandit -r . -f txt
+
+    - name: Run pip-audit (fail on high severity)
+      run: pip-audit --format json --output pip-audit.json --fail-on high

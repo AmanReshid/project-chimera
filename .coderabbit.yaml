@@ -1,0 +1,47 @@
+version: 1
+policy:
+  name: "Project Chimera — AI Review Policy"
+  description: |
+    Automated AI reviewer configuration for CodeRabbit. Primary goals:
+      - Verify code aligns with the project specs in `specs/` (spec alignment).
+      - Detect obvious security vulnerabilities (dependencies, code patterns).
+    The reviewer should run the local spec-check script and run standard Python security scanners.
+
+checks:
+  - id: spec_alignment
+    name: "Spec Alignment"
+    description: "Run the repository's spec alignment checks and report mismatches or missing documentation/tests."
+    severity: high
+    run:
+      - cmd: ["python", "scripts/spec_check.py"]
+      - when: always
+
+  - id: security_vulnerabilities
+    name: "Security Vulnerabilities"
+    description: |
+      Run static vulnerability scanners and dependency audits. Report findings with severity levels and suggested remediations.
+    severity: critical
+    run:
+      - cmd: ["python", "-m", "pip", "install", "bandit", "pip-audit"]
+      - cmd: ["bandit", "-r", ".", "-f", "txt"]
+      - cmd: ["pip-audit", "--output", "pip-audit.json"]
+
+reporting:
+  format: markdown
+  include:
+    - check_id
+    - severity
+    - summary
+    - remediation
+
+actions:
+  on_fail: fail
+  comments:
+    issue_template: |
+      **AI Review - {check_id}**
+      Severity: {severity}
+
+      {summary}
+
+      Suggested remediation:
+      {remediation}
